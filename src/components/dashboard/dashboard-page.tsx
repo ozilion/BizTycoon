@@ -6,7 +6,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { Banknote, Briefcase, TrendingUp, Clock, Zap, Building, ShoppingCart, Bus, Fuel, HelpCircle } from "lucide-react";
+import { 
+  Banknote, 
+  Briefcase, 
+  TrendingUp, 
+  Clock, 
+  Zap, 
+  Building, 
+  ShoppingCart, 
+  Bus, 
+  Fuel, 
+  HelpCircle,
+  CupSoda,
+  Laptop,
+  Cookie,
+  Leaf,
+  Coffee,
+  Gamepad2
+} from "lucide-react";
 import { useState, useEffect } from 'react';
 import Image from "next/image";
 import { trackAdEngagement, showInterstitialAd, loadInterstitialAd } from '@/services/admob';
@@ -36,9 +53,15 @@ const initialBusinesses: Business[] = [
 ];
 
 const availableBusinesses: Omit<Business, 'id' | 'lastCollected' | 'level' | 'marketValue' | 'upgradeCost'>[] = [
+    { name: "Classic Lemonade Stand", sector: "Food & Beverage", icon: CupSoda, imageUrl: "https://picsum.photos/seed/lemonade/400/200", cost: 500, incomePerSecond: 0.5, productionTime: 600, aiHint: "lemonade stand" },
+    { name: "Tech Tinker Inc.", sector: "Technology Services", icon: Laptop, imageUrl: "https://picsum.photos/seed/webdev/400/200", cost: 2000, incomePerSecond: 2, productionTime: 1200, aiHint: "computer desk" },
+    { name: "The Artisan Bakery", sector: "Food & Beverage", icon: Cookie, imageUrl: "https://picsum.photos/seed/bakery/400/200", cost: 8000, incomePerSecond: 4, productionTime: 1800, aiHint: "artisan bread" },
+    { name: "Green Thumb Landscaping", sector: "Services", icon: Leaf, imageUrl: "https://picsum.photos/seed/landscaping/400/200", cost: 12000, incomePerSecond: 6, productionTime: 3600, aiHint: "garden tools" },
+    { name: "Bytes & Brews Cafe", sector: "Food & Tech", icon: Coffee, imageUrl: "https://picsum.photos/seed/techcafe/400/200", cost: 25000, incomePerSecond: 10, productionTime: 4500, aiHint: "modern cafe" },
+    { name: "The General Store", sector: "Retail", icon: ShoppingCart, imageUrl: "https://picsum.photos/seed/retail/400/200", cost: 40000, incomePerSecond: 4, productionTime: 2700, aiHint: "general store" },
+    { name: "Indie Game Studio", sector: "Entertainment", icon: Gamepad2, imageUrl: "https://picsum.photos/seed/gamestudio/400/200", cost: 50000, incomePerSecond: 12, productionTime: 9000, aiHint: "game development" },
     { name: "Metro Transit", sector: "Transportation", icon: Bus, imageUrl: "https://picsum.photos/seed/transit/400/200", cost: 120000, incomePerSecond: 10, productionTime: 5400, aiHint: "city bus" },
     { name: "Cornerstone Construction", sector: "Construction", icon: Building, imageUrl: "https://picsum.photos/seed/construction/400/200", cost: 200000, incomePerSecond: 15, productionTime: 10800, aiHint: "construction site" },
-    { name: "The General Store", sector: "Retail", icon: ShoppingCart, imageUrl: "https://picsum.photos/seed/retail/400/200", cost: 40000, incomePerSecond: 4, productionTime: 2700, aiHint: "general store" },
 ];
 
 interface FormattedAvailableBusinessStrings {
@@ -107,7 +130,7 @@ export const DashboardPage: NextPage = () => {
     if (balance >= businessToEstablish.cost) {
       const newBusiness: Business = {
         ...businessToEstablish,
-        id: `${businessToEstablish.sector.toLowerCase()}-${Date.now()}`,
+        id: `${businessToEstablish.sector.toLowerCase().replace(/[^a-z0-9]/gi, '')}-${Date.now()}`, // Sanitize sector for ID
         level: 1,
         marketValue: businessToEstablish.cost * 1.2,
         upgradeCost: businessToEstablish.cost * 0.5,
@@ -117,7 +140,7 @@ export const DashboardPage: NextPage = () => {
       setOwnedBusinesses(prevBusinesses => [...prevBusinesses, newBusiness]);
       toast({ title: "Business Established!", description: `${newBusiness.name} is now part of your empire.` });
     } else {
-      toast({ title: "Insufficient Funds", description: `You need $${(formattedAvailableBizStrings[businessToEstablish.name]?.cost || businessToEstablish.cost)} to establish ${businessToEstablish.name}.`, variant: "destructive" });
+      toast({ title: "Insufficient Funds", description: `You need $${(formattedAvailableBizStrings[businessToEstablish.name]?.cost || businessToEstablish.cost.toLocaleString())} to establish ${businessToEstablish.name}.`, variant: "destructive" });
     }
   };
 
@@ -236,8 +259,8 @@ export const DashboardPage: NextPage = () => {
 
       <div id="available-ventures">
         <h2 className="text-2xl font-semibold mb-4 text-primary">Available Ventures</h2>
-        {availableBusinesses.length === 0 && ownedBusinesses.length > 0 && <p className="text-muted-foreground">You've established all available ventures for now! Expand your current ones.</p>}
-        {availableBusinesses.length === 0 && ownedBusinesses.length === 0 && <p className="text-muted-foreground">No ventures available to establish currently. Check back later!</p>}
+        {availableBusinesses.filter(availBiz => !ownedBusinesses.some(ownedBiz => ownedBiz.name === availBiz.name)).length === 0 && <p className="text-muted-foreground">You've established all available ventures for now! Expand your current ones or check back later for new opportunities.</p>}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {availableBusinesses.filter(availBiz => !ownedBusinesses.some(ownedBiz => ownedBiz.name === availBiz.name)).map((biz, index) => (
             <Card key={index} className="shadow-md hover:shadow-xl transition-shadow duration-300">
@@ -249,7 +272,7 @@ export const DashboardPage: NextPage = () => {
                 <CardDescription>
                     {formattedAvailableBizStrings[biz.name] ? 
                         `Cost: $${formattedAvailableBizStrings[biz.name].cost} | Income: $${formattedAvailableBizStrings[biz.name].incomePerSecond}/sec`
-                        : `Cost: $... | Income: $.../sec`
+                        : `Cost: $${biz.cost.toLocaleString()} | Income: $${biz.incomePerSecond.toLocaleString()}/sec`
                     }
                 </CardDescription>
               </CardHeader>
@@ -283,7 +306,12 @@ export const DashboardPage: NextPage = () => {
             </CardHeader>
             <CardContent>
               <CardDescription className="mb-4">Start your empire by establishing a new business venture from the "Available Ventures" section.</CardDescription>
-              <Button onClick={() => document.querySelector('#available-ventures')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button onClick={() => {
+                  const availableVenturesSection = document.querySelector('#available-ventures');
+                  if (availableVenturesSection) {
+                    availableVenturesSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}>
                 Find Ventures
               </Button>
             </CardContent>

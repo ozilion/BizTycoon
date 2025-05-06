@@ -41,9 +41,9 @@ export default function ProfilePage() {
   };
 
   const [userProfile, setUserProfile] = useState(initialUserProfile);
-  const [formattedMarketValue, setFormattedMarketValue] = useState(initialUserProfile.totalMarketValue.toString());
-  const [formattedTotalIncome, setFormattedTotalIncome] = useState(initialUserProfile.totalIncome.toString());
-  const [formattedTotalExpenses, setFormattedTotalExpenses] = useState(initialUserProfile.totalExpenses.toString());
+  const [formattedMarketValue, setFormattedMarketValue] = useState('');
+  const [formattedTotalIncome, setFormattedTotalIncome] = useState('');
+  const [formattedTotalExpenses, setFormattedTotalExpenses] = useState('');
   const [formattedCompanyValues, setFormattedCompanyValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function ProfilePage() {
                       <p className="font-medium">{company.name}</p>
                       <p className="text-xs text-muted-foreground">{company.sector}</p>
                     </div>
-                    <p className="font-semibold text-primary">${formattedCompanyValues[company.id] || company.value}</p>
+                    <p className="font-semibold text-primary">${formattedCompanyValues[company.id] || company.value.toLocaleString()}</p>
                   </li>
                 ))}
               </ul>
@@ -121,4 +121,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

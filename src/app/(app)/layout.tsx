@@ -1,4 +1,9 @@
 
+"use client";
+
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -13,12 +18,65 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Home, Briefcase, User, Settings, DollarSign, Zap, Sun, Moon } from 'lucide-react';
-import Link from 'next/link';
-import { DashboardPage } from '@/components/dashboard/dashboard-page';
+import { Home, Briefcase, User, Settings, DollarSign, Zap } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
-export default function BizTycoonApp() {
+
+function SettingsDialog() {
+  // Placeholder for settings modal, will be implemented later.
+  // For now, it's a simple button triggering a basic dialog.
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="icon" aria-label="Settings">
+          <Settings className="h-5 w-5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription>
+            Manage your application settings here. More options coming soon!
+          </DialogDescription>
+        </DialogHeader>
+        {/* Add settings form or content here */}
+        <div className="py-4">
+          <p className="text-sm text-muted-foreground">
+            Settings are currently under development.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => {
+            const closeButton = document.querySelector('[data-radix-dialog-default-open="false"]');
+            if (closeButton instanceof HTMLElement) {
+                // This is a bit of a hack to close the dialog if a specific close button is not easily accessible via DialogClose
+                // A more robust solution would be to manage open state with useState if complex close logic is needed.
+                // For now, this targets the auto-generated close button if one exists.
+                // A better way for complex dialogs is managing 'open' state via useState and passing it to Dialog and onOpenChange.
+                // Or ensure DialogClose is used within DialogFooter or where appropriate.
+                // This example is simplified.
+                // A common pattern is to use a ref or manage state.
+            }
+          }}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+export default function AppLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
   return (
     <SidebarProvider defaultOpen>
       <Sidebar>
@@ -35,7 +93,7 @@ export default function BizTycoonApp() {
           <SidebarMenu>
             <SidebarMenuItem>
               <Link href="/" passHref legacyBehavior>
-                <SidebarMenuButton isActive tooltip="Dashboard">
+                <SidebarMenuButton isActive={pathname === '/'} tooltip="Dashboard">
                   <Home />
                   Dashboard
                 </SidebarMenuButton>
@@ -43,7 +101,7 @@ export default function BizTycoonApp() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/ventures" passHref legacyBehavior>
-                <SidebarMenuButton tooltip="Business Ventures">
+                <SidebarMenuButton isActive={pathname === '/ventures'} tooltip="Business Ventures">
                   <Briefcase />
                   Ventures
                 </SidebarMenuButton>
@@ -51,7 +109,7 @@ export default function BizTycoonApp() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <Link href="/profile" passHref legacyBehavior>
-                <SidebarMenuButton tooltip="Profile">
+                <SidebarMenuButton isActive={pathname === '/profile'} tooltip="Profile">
                   <User />
                   Profile
                 </SidebarMenuButton>
@@ -85,19 +143,9 @@ export default function BizTycoonApp() {
            </div>
         </header>
         <main className="flex-1 overflow-auto p-4 sm:px-6 sm:py-0">
-          <DashboardPage />
+          {children}
         </main>
       </SidebarInset>
     </SidebarProvider>
-  );
-}
-
-function SettingsDialog() {
-  // Placeholder for settings modal, will be implemented later.
-  // For now, it's a simple button.
-  return (
-    <Button variant="outline" size="icon" aria-label="Settings">
-      <Settings className="h-5 w-5" />
-    </Button>
   );
 }

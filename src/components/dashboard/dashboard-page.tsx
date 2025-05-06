@@ -41,6 +41,10 @@ const availableBusinesses: Omit<Business, 'id' | 'lastCollected' | 'level' | 'ma
     { name: "The General Store", sector: "Retail", icon: ShoppingCart, imageUrl: "https://picsum.photos/seed/retail/400/200", cost: 40000, incomePerSecond: 4, productionTime: 2700, aiHint: "general store" },
 ];
 
+interface FormattedAvailableBusinessStrings {
+  cost: string;
+  incomePerSecond: string;
+}
 
 export const DashboardPage: NextPage = () => {
   const initialBalance = 10000;
@@ -52,6 +56,8 @@ export const DashboardPage: NextPage = () => {
   const [dailyIncome, setDailyIncome] = useState(0);
   const [formattedDailyIncome, setFormattedDailyIncome] = useState("0");
   const { toast } = useToast();
+  const [formattedAvailableBizStrings, setFormattedAvailableBizStrings] = useState<Record<string, FormattedAvailableBusinessStrings>>({});
+
 
   useEffect(() => {
     loadInterstitialAd();
@@ -111,7 +117,7 @@ export const DashboardPage: NextPage = () => {
       setOwnedBusinesses(prevBusinesses => [...prevBusinesses, newBusiness]);
       toast({ title: "Business Established!", description: `${newBusiness.name} is now part of your empire.` });
     } else {
-      toast({ title: "Insufficient Funds", description: `You need $${businessToEstablish.cost.toLocaleString()} to establish ${businessToEstablish.name}.`, variant: "destructive" });
+      toast({ title: "Insufficient Funds", description: `You need $${(formattedAvailableBizStrings[businessToEstablish.name]?.cost || businessToEstablish.cost)} to establish ${businessToEstablish.name}.`, variant: "destructive" });
     }
   };
 
@@ -184,6 +190,16 @@ export const DashboardPage: NextPage = () => {
       newClientIncomeReadyToCollect[biz.id] = incomeReady.toLocaleString();
     });
     setClientIncomeReadyToCollect(newClientIncomeReadyToCollect);
+
+    const newFormattedAvailableBizStrings: Record<string, FormattedAvailableBusinessStrings> = {};
+    availableBusinesses.forEach(biz => {
+        newFormattedAvailableBizStrings[biz.name] = {
+            cost: biz.cost.toLocaleString(),
+            incomePerSecond: biz.incomePerSecond.toLocaleString(),
+        };
+    });
+    setFormattedAvailableBizStrings(newFormattedAvailableBizStrings);
+
   }, [ownedBusinesses, balance]); // Re-calculate when businesses or balance changes to update collected amounts
 
   return (
@@ -230,7 +246,12 @@ export const DashboardPage: NextPage = () => {
                   <CardTitle className="flex items-center gap-2 text-xl"><biz.icon className="h-6 w-6 text-primary" />{biz.name}</CardTitle>
                    <span className="text-xs text-muted-foreground">{biz.sector}</span>
                 </div>
-                <CardDescription>Cost: ${biz.cost.toLocaleString()} | Income: ${biz.incomePerSecond.toLocaleString()}/sec</CardDescription>
+                <CardDescription>
+                    {formattedAvailableBizStrings[biz.name] ? 
+                        `Cost: $${formattedAvailableBizStrings[biz.name].cost} | Income: $${formattedAvailableBizStrings[biz.name].incomePerSecond}/sec`
+                        : `Cost: $... | Income: $.../sec`
+                    }
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Image 

@@ -1,0 +1,288 @@
+
+"use client";
+
+import type { NextPage } from "next";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Banknote, Briefcase, TrendingUp, Clock, Zap, Building, ShoppingCart, Bus, Fuel, HelpCircle } from "lucide-react";
+import { useState, useEffect } from 'react';
+import Image from "next/image";
+import { trackAdEngagement, showInterstitialAd, loadInterstitialAd } from '@/services/admob';
+import { useToast } from "@/hooks/use-toast";
+
+
+interface Business {
+  id: string;
+  name: string;
+  sector: string;
+  icon: React.ElementType;
+  imageUrl: string;
+  cost: number;
+  incomePerSecond: number;
+  marketValue: number;
+  level: number;
+  upgradeCost: number;
+  productionTime: number; // in seconds
+  lastCollected: number; // timestamp
+  aiHint: string;
+}
+
+const initialBusinesses: Business[] = [
+  { id: "bank-1", name: "Community Bank", sector: "Finance", icon: Banknote, imageUrl: "https://picsum.photos/seed/bank/400/200", cost: 50000, incomePerSecond: 5, marketValue: 60000, level: 1, upgradeCost: 25000, productionTime: 3600, lastCollected: Date.now(), aiHint: "modern bank" },
+  { id: "sports-1", name: "Local Kickers FC", sector: "Sports", icon: Briefcase, imageUrl: "https://picsum.photos/seed/sports/400/200", cost: 75000, incomePerSecond: 8, marketValue: 90000, level: 1, upgradeCost: 35000, productionTime: 7200, lastCollected: Date.now(), aiHint: "soccer stadium"  },
+  { id: "fuel-1", name: "Speedy Gas", sector: "Energy", icon: Fuel, imageUrl: "https://picsum.photos/seed/fuel/400/200", cost: 30000, incomePerSecond: 3, marketValue: 35000, level: 1, upgradeCost: 15000, productionTime: 1800, lastCollected: Date.now(), aiHint: "gas station"  },
+];
+
+const availableBusinesses: Omit<Business, 'id' | 'lastCollected' | 'level' | 'marketValue' | 'upgradeCost'>[] = [
+    { name: "Metro Transit", sector: "Transportation", icon: Bus, imageUrl: "https://picsum.photos/seed/transit/400/200", cost: 120000, incomePerSecond: 10, productionTime: 5400, aiHint: "city bus" },
+    { name: "Cornerstone Construction", sector: "Construction", icon: Building, imageUrl: "https://picsum.photos/seed/construction/400/200", cost: 200000, incomePerSecond: 15, productionTime: 10800, aiHint: "construction site" },
+    { name: "The General Store", sector: "Retail", icon: ShoppingCart, imageUrl: "https://picsum.photos/seed/retail/400/200", cost: 40000, incomePerSecond: 4, productionTime: 2700, aiHint: "general store" },
+];
+
+
+export const DashboardPage: NextPage = () => {
+  const [balance, setBalance] = useState(10000); // Start with a small budget
+  const [ownedBusinesses, setOwnedBusinesses] = useState<Business[]>([]);
+  const [hourlyIncome, setHourlyIncome] = useState(0);
+  const [dailyIncome, setDailyIncome] = useState(0);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadInterstitialAd();
+  }, []);
+
+  useEffect(() => {
+    const calculateIncome = () => {
+      let currentTotalIncomePerSecond = 0;
+      const now = Date.now();
+      let collectedAmount = 0;
+
+      setOwnedBusinesses(prevBusinesses => 
+        prevBusinesses.map(biz => {
+          const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+          const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
+          const incomeGenerated = collectableSeconds * biz.incomePerSecond;
+          collectedAmount += incomeGenerated;
+          return { ...biz, lastCollected: biz.lastCollected + collectableSeconds * 1000 };
+        })
+      );
+      
+      setBalance(prev => prev + collectedAmount);
+
+      currentTotalIncomePerSecond = ownedBusinesses.reduce((sum, biz) => sum + biz.incomePerSecond, 0);
+      setHourlyIncome(currentTotalIncomePerSecond * 3600);
+      setDailyIncome(currentTotalIncomePerSecond * 3600 * 24);
+    };
+
+    const interval = setInterval(calculateIncome, 1000); // Update income every second
+    return () => clearInterval(interval);
+  }, [ownedBusinesses]);
+
+
+  const establishBusiness = (businessToEstablish: Omit<Business, 'id' | 'lastCollected' | 'level'| 'marketValue' | 'upgradeCost'>) => {
+    if (balance >= businessToEstablish.cost) {
+      const newBusiness: Business = {
+        ...businessToEstablish,
+        id: `${businessToEstablish.sector.toLowerCase()}-${Date.now()}`,
+        level: 1,
+        marketValue: businessToEstablish.cost * 1.2,
+        upgradeCost: businessToEstablish.cost * 0.5,
+        lastCollected: Date.now(),
+      };
+      setBalance(prevBalance => prevBalance - newBusiness.cost);
+      setOwnedBusinesses(prevBusinesses => [...prevBusinesses, newBusiness]);
+      toast({ title: "Business Established!", description: `${newBusiness.name} is now part of your empire.` });
+    } else {
+      toast({ title: "Insufficient Funds", description: `You need $${businessToEstablish.cost.toLocaleString()} to establish ${businessToEstablish.name}.`, variant: "destructive" });
+    }
+  };
+
+  const collectIncome = (businessId: string) => {
+    const now = Date.now();
+    let collectedAmount = 0;
+    setOwnedBusinesses(prevBusinesses => 
+      prevBusinesses.map(biz => {
+        if (biz.id === businessId) {
+          const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+          const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
+          const incomeGenerated = collectableSeconds * biz.incomePerSecond;
+          collectedAmount += incomeGenerated;
+          toast({ title: "Income Collected!", description: `Collected $${incomeGenerated.toLocaleString()} from ${biz.name}.` });
+          return { ...biz, lastCollected: now };
+        }
+        return biz;
+      })
+    );
+    setBalance(prevBalance => prevBalance + collectedAmount);
+  };
+  
+  const handleWatchAd = async (businessId: string) => {
+    const adShown = await showInterstitialAd();
+    if (adShown) {
+      await trackAdEngagement();
+      // Boost income for a specific business or apply a general boost
+      setOwnedBusinesses(prevBusinesses => 
+        prevBusinesses.map(biz => {
+          if (biz.id === businessId) {
+            // Example: Double income for the next hour (simulation)
+            // This is a simplified representation. Real implementation would need robust tracking.
+            toast({ title: "Ad Watched!", description: `${biz.name} production boosted!` });
+            return { ...biz, incomePerSecond: biz.incomePerSecond * 1.2 }; // 20% boost
+          }
+          return biz;
+        })
+      );
+      setTimeout(() => {
+         setOwnedBusinesses(prevBusinesses => 
+            prevBusinesses.map(biz => {
+              if (biz.id === businessId) {
+                return { ...biz, incomePerSecond: biz.incomePerSecond / 1.2 }; // Revert boost
+              }
+              return biz;
+            })
+          );
+          toast({ title: "Boost Expired", description: `Production boost for ${businessId} has ended.` });
+      }, 60 * 60 * 1000); // Boost for 1 hour
+    } else {
+       toast({ title: "Ad Not Available", description: "Please try again later.", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <Card className="shadow-lg">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-3xl font-bold text-primary">Dashboard</CardTitle>
+          <div className="flex items-center gap-2 text-accent">
+            <Banknote className="h-8 w-8" />
+            <span className="text-3xl font-semibold">${balance.toLocaleString()}</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg shadow">
+              <Clock className="h-6 w-6 text-primary" />
+              <div>
+                <p className="text-muted-foreground">Hourly Income</p>
+                <p className="font-semibold text-lg">${hourlyIncome.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg shadow">
+              <TrendingUp className="h-6 w-6 text-primary" />
+              <div>
+                <p className="text-muted-foreground">Daily Income</p>
+                <p className="font-semibold text-lg">${dailyIncome.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <div>
+        <h2 className="text-2xl font-semibold mb-4 text-primary">Available Ventures</h2>
+        {availableBusinesses.length === 0 && ownedBusinesses.length > 0 && <p className="text-muted-foreground">You've established all available ventures for now! Expand your current ones.</p>}
+        {availableBusinesses.length === 0 && ownedBusinesses.length === 0 && <p className="text-muted-foreground">No ventures available to establish currently. Check back later!</p>}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {availableBusinesses.filter(availBiz => !ownedBusinesses.some(ownedBiz => ownedBiz.name === availBiz.name)).map((biz, index) => (
+            <Card key={index} className="shadow-md hover:shadow-xl transition-shadow duration-300">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xl"><biz.icon className="h-6 w-6 text-primary" />{biz.name}</CardTitle>
+                   <span className="text-xs text-muted-foreground">{biz.sector}</span>
+                </div>
+                <CardDescription>Cost: ${biz.cost.toLocaleString()} | Income: ${biz.incomePerSecond.toLocaleString()}/sec</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Image 
+                  src={biz.imageUrl} 
+                  alt={biz.name} 
+                  width={400} 
+                  height={200} 
+                  className="rounded-md mb-4 object-cover aspect-video"
+                  data-ai-hint={biz.aiHint} 
+                />
+                <Button onClick={() => establishBusiness(biz)} className="w-full" disabled={balance < biz.cost}>
+                  Establish Business
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+      
+      <Separator />
+
+      <div>
+        <h2 className="text-2xl font-semibold mb-4 text-primary">My Businesses</h2>
+        {ownedBusinesses.length === 0 ? (
+          <Card className="text-center p-8 shadow-md">
+            <CardHeader>
+              <HelpCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <CardTitle className="text-xl">No Businesses Yet!</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CardDescription className="mb-4">Start your empire by establishing a new business venture from the "Available Ventures" section.</CardDescription>
+              <Button onClick={() => document.querySelector('#available-ventures')?.scrollIntoView({ behavior: 'smooth' })}>
+                Find Ventures
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {ownedBusinesses.map((biz) => {
+              const now = Date.now();
+              const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+              const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
+              const progressPercentage = (collectableSeconds / biz.productionTime) * 100;
+              const incomeReadyToCollect = collectableSeconds * biz.incomePerSecond;
+
+              return (
+                <Card key={biz.id} className="shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col">
+                  <CardHeader>
+                     <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-xl"><biz.icon className="h-6 w-6 text-primary" />{biz.name}</CardTitle>
+                        <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full">Lvl {biz.level}</span>
+                     </div>
+                    <CardDescription>Sector: {biz.sector} | Income: ${biz.incomePerSecond.toLocaleString()}/sec</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-grow flex flex-col justify-between">
+                    <div>
+                        <Image 
+                            src={biz.imageUrl} 
+                            alt={biz.name} 
+                            width={400} 
+                            height={200} 
+                            className="rounded-md mb-4 object-cover aspect-video"
+                            data-ai-hint={biz.aiHint} 
+                        />
+                        <div className="mb-2">
+                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <span>Production Cycle</span>
+                            <span>{Math.floor(collectableSeconds/60)}m / {biz.productionTime/60}m</span>
+                            </div>
+                            <Progress value={progressPercentage} className="w-full h-2" />
+                            <p className="text-xs text-muted-foreground mt-1 text-right">Ready: ${incomeReadyToCollect.toLocaleString()}</p>
+                        </div>
+                    </div>
+                    <div className="space-y-2 mt-auto">
+                        <Button onClick={() => collectIncome(biz.id)} className="w-full" disabled={incomeReadyToCollect <= 0}>
+                            Collect ${incomeReadyToCollect.toLocaleString()}
+                        </Button>
+                        <Button onClick={() => handleWatchAd(biz.id)} variant="outline" className="w-full border-accent text-accent hover:bg-accent/10">
+                            <Zap className="mr-2 h-4 w-4" /> Watch Ad for Boost
+                        </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

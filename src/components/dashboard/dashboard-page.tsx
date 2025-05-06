@@ -43,15 +43,31 @@ const availableBusinesses: Omit<Business, 'id' | 'lastCollected' | 'level' | 'ma
 
 
 export const DashboardPage: NextPage = () => {
-  const [balance, setBalance] = useState(10000); // Start with a small budget
+  const initialBalance = 10000;
+  const [balance, setBalance] = useState(initialBalance);
+  const [formattedBalance, setFormattedBalance] = useState(initialBalance.toString());
   const [ownedBusinesses, setOwnedBusinesses] = useState<Business[]>([]);
   const [hourlyIncome, setHourlyIncome] = useState(0);
+  const [formattedHourlyIncome, setFormattedHourlyIncome] = useState("0");
   const [dailyIncome, setDailyIncome] = useState(0);
+  const [formattedDailyIncome, setFormattedDailyIncome] = useState("0");
   const { toast } = useToast();
 
   useEffect(() => {
     loadInterstitialAd();
   }, []);
+
+  useEffect(() => {
+    setFormattedBalance(balance.toLocaleString());
+  }, [balance]);
+
+  useEffect(() => {
+    setFormattedHourlyIncome(hourlyIncome.toLocaleString());
+  }, [hourlyIncome]);
+
+  useEffect(() => {
+    setFormattedDailyIncome(dailyIncome.toLocaleString());
+  }, [dailyIncome]);
 
   useEffect(() => {
     const calculateIncome = () => {
@@ -102,6 +118,7 @@ export const DashboardPage: NextPage = () => {
   const collectIncome = (businessId: string) => {
     const now = Date.now();
     let collectedAmount = 0;
+    let collectedBusinessName = "";
     setOwnedBusinesses(prevBusinesses => 
       prevBusinesses.map(biz => {
         if (biz.id === businessId) {
@@ -109,25 +126,27 @@ export const DashboardPage: NextPage = () => {
           const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
           const incomeGenerated = collectableSeconds * biz.incomePerSecond;
           collectedAmount += incomeGenerated;
-          toast({ title: "Income Collected!", description: `Collected $${incomeGenerated.toLocaleString()} from ${biz.name}.` });
+          collectedBusinessName = biz.name;
           return { ...biz, lastCollected: now };
         }
         return biz;
       })
     );
     setBalance(prevBalance => prevBalance + collectedAmount);
+    if (collectedAmount > 0 && collectedBusinessName) {
+        toast({ title: "Income Collected!", description: `Collected $${collectedAmount.toLocaleString()} from ${collectedBusinessName}.` });
+    }
   };
   
   const handleWatchAd = async (businessId: string) => {
     const adShown = await showInterstitialAd();
     if (adShown) {
       await trackAdEngagement();
-      // Boost income for a specific business or apply a general boost
+      let boostedBusinessName = "";
       setOwnedBusinesses(prevBusinesses => 
         prevBusinesses.map(biz => {
           if (biz.id === businessId) {
-            // Example: Double income for the next hour (simulation)
-            // This is a simplified representation. Real implementation would need robust tracking.
+            boostedBusinessName = biz.name;
             toast({ title: "Ad Watched!", description: `${biz.name} production boosted!` });
             return { ...biz, incomePerSecond: biz.incomePerSecond * 1.2 }; // 20% boost
           }
@@ -137,18 +156,35 @@ export const DashboardPage: NextPage = () => {
       setTimeout(() => {
          setOwnedBusinesses(prevBusinesses => 
             prevBusinesses.map(biz => {
-              if (biz.id === businessId) {
+              if (biz.id === businessId && biz.name === boostedBusinessName) { // ensure we are reverting the correct boost
                 return { ...biz, incomePerSecond: biz.incomePerSecond / 1.2 }; // Revert boost
               }
               return biz;
             })
           );
-          toast({ title: "Boost Expired", description: `Production boost for ${businessId} has ended.` });
+          if (boostedBusinessName) {
+            toast({ title: "Boost Expired", description: `Production boost for ${boostedBusinessName} has ended.` });
+          }
       }, 60 * 60 * 1000); // Boost for 1 hour
     } else {
        toast({ title: "Ad Not Available", description: "Please try again later.", variant: "destructive" });
     }
   };
+
+  // Client-side only state for formatted income values to avoid hydration issues with toLocaleString
+  const [clientIncomeReadyToCollect, setClientIncomeReadyToCollect] = useState<{[key: string]: string}>({});
+
+  useEffect(() => {
+    const newClientIncomeReadyToCollect: {[key: string]: string} = {};
+    ownedBusinesses.forEach(biz => {
+      const now = Date.now();
+      const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+      const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
+      const incomeReady = collectableSeconds * biz.incomePerSecond;
+      newClientIncomeReadyToCollect[biz.id] = incomeReady.toLocaleString();
+    });
+    setClientIncomeReadyToCollect(newClientIncomeReadyToCollect);
+  }, [ownedBusinesses, balance]); // Re-calculate when businesses or balance changes to update collected amounts
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -157,7 +193,7 @@ export const DashboardPage: NextPage = () => {
           <CardTitle className="text-3xl font-bold text-primary">Dashboard</CardTitle>
           <div className="flex items-center gap-2 text-accent">
             <Banknote className="h-8 w-8" />
-            <span className="text-3xl font-semibold">${balance.toLocaleString()}</span>
+            <span className="text-3xl font-semibold">${formattedBalance}</span>
           </div>
         </CardHeader>
         <CardContent>
@@ -166,14 +202,14 @@ export const DashboardPage: NextPage = () => {
               <Clock className="h-6 w-6 text-primary" />
               <div>
                 <p className="text-muted-foreground">Hourly Income</p>
-                <p className="font-semibold text-lg">${hourlyIncome.toLocaleString()}</p>
+                <p className="font-semibold text-lg">${formattedHourlyIncome}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg shadow">
               <TrendingUp className="h-6 w-6 text-primary" />
               <div>
                 <p className="text-muted-foreground">Daily Income</p>
-                <p className="font-semibold text-lg">${dailyIncome.toLocaleString()}</p>
+                <p className="font-semibold text-lg">${formattedDailyIncome}</p>
               </div>
             </div>
           </div>
@@ -182,7 +218,7 @@ export const DashboardPage: NextPage = () => {
 
       <Separator />
 
-      <div>
+      <div id="available-ventures">
         <h2 className="text-2xl font-semibold mb-4 text-primary">Available Ventures</h2>
         {availableBusinesses.length === 0 && ownedBusinesses.length > 0 && <p className="text-muted-foreground">You've established all available ventures for now! Expand your current ones.</p>}
         {availableBusinesses.length === 0 && ownedBusinesses.length === 0 && <p className="text-muted-foreground">No ventures available to establish currently. Check back later!</p>}
@@ -237,8 +273,10 @@ export const DashboardPage: NextPage = () => {
               const now = Date.now();
               const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
               const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
-              const progressPercentage = (collectableSeconds / biz.productionTime) * 100;
-              const incomeReadyToCollect = collectableSeconds * biz.incomePerSecond;
+              const progressPercentage = biz.productionTime > 0 ? (collectableSeconds / biz.productionTime) * 100 : 0;
+              const incomeReadyToCollectNum = collectableSeconds * biz.incomePerSecond;
+              const displayIncomeReadyToCollect = clientIncomeReadyToCollect[biz.id] || '0';
+
 
               return (
                 <Card key={biz.id} className="shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col">
@@ -262,15 +300,15 @@ export const DashboardPage: NextPage = () => {
                         <div className="mb-2">
                             <div className="flex justify-between text-xs text-muted-foreground mb-1">
                             <span>Production Cycle</span>
-                            <span>{Math.floor(collectableSeconds/60)}m / {biz.productionTime/60}m</span>
+                            <span>{Math.floor(collectableSeconds/60)}m / {biz.productionTime > 0 ? biz.productionTime/60 : 0}m</span>
                             </div>
                             <Progress value={progressPercentage} className="w-full h-2" />
-                            <p className="text-xs text-muted-foreground mt-1 text-right">Ready: ${incomeReadyToCollect.toLocaleString()}</p>
+                            <p className="text-xs text-muted-foreground mt-1 text-right">Ready: ${displayIncomeReadyToCollect}</p>
                         </div>
                     </div>
                     <div className="space-y-2 mt-auto">
-                        <Button onClick={() => collectIncome(biz.id)} className="w-full" disabled={incomeReadyToCollect <= 0}>
-                            Collect ${incomeReadyToCollect.toLocaleString()}
+                        <Button onClick={() => collectIncome(biz.id)} className="w-full" disabled={incomeReadyToCollectNum <= 0}>
+                            Collect ${displayIncomeReadyToCollect}
                         </Button>
                         <Button onClick={() => handleWatchAd(biz.id)} variant="outline" className="w-full border-accent text-accent hover:bg-accent/10">
                             <Zap className="mr-2 h-4 w-4" /> Watch Ad for Boost
@@ -286,3 +324,4 @@ export const DashboardPage: NextPage = () => {
     </div>
   );
 };
+

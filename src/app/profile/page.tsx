@@ -1,12 +1,32 @@
 
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, DollarSign, TrendingUp, TrendingDown, Building } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useState, useEffect } from 'react';
+
+interface Company {
+  id: string;
+  name: string;
+  sector: string;
+  value: number;
+}
+
+interface UserProfileData {
+  name: string;
+  avatarUrl: string;
+  avatarFallback: string;
+  totalMarketValue: number;
+  totalIncome: number;
+  totalExpenses: number;
+  establishedCompanies: Company[];
+}
 
 export default function ProfilePage() {
   // Placeholder data - will be dynamic later
-  const userProfile = {
+  const initialUserProfile: UserProfileData = {
     name: "Tycoon User",
     avatarUrl: "https://picsum.photos/200/200?q=profile",
     avatarFallback: "TU",
@@ -19,6 +39,26 @@ export default function ProfilePage() {
       { id: "3", name: "Speedy Gas", sector: "Energy", value: 200000 },
     ],
   };
+
+  const [userProfile, setUserProfile] = useState(initialUserProfile);
+  const [formattedMarketValue, setFormattedMarketValue] = useState(initialUserProfile.totalMarketValue.toString());
+  const [formattedTotalIncome, setFormattedTotalIncome] = useState(initialUserProfile.totalIncome.toString());
+  const [formattedTotalExpenses, setFormattedTotalExpenses] = useState(initialUserProfile.totalExpenses.toString());
+  const [formattedCompanyValues, setFormattedCompanyValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setFormattedMarketValue(userProfile.totalMarketValue.toLocaleString());
+    setFormattedTotalIncome(userProfile.totalIncome.toLocaleString());
+    setFormattedTotalExpenses(userProfile.totalExpenses.toLocaleString());
+    
+    const newFormattedCompanyValues: Record<string, string> = {};
+    userProfile.establishedCompanies.forEach(company => {
+      newFormattedCompanyValues[company.id] = company.value.toLocaleString();
+    });
+    setFormattedCompanyValues(newFormattedCompanyValues);
+
+  }, [userProfile]);
+
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -39,17 +79,17 @@ export default function ProfilePage() {
             <Card className="p-4 shadow-sm bg-secondary">
               <DollarSign className="h-8 w-8 text-accent mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Total Market Value</p>
-              <p className="text-2xl font-semibold">${userProfile.totalMarketValue.toLocaleString()}</p>
+              <p className="text-2xl font-semibold">${formattedMarketValue}</p>
             </Card>
             <Card className="p-4 shadow-sm bg-secondary">
               <TrendingUp className="h-8 w-8 text-green-500 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Total Income</p>
-              <p className="text-2xl font-semibold">${userProfile.totalIncome.toLocaleString()}</p>
+              <p className="text-2xl font-semibold">${formattedTotalIncome}</p>
             </Card>
             <Card className="p-4 shadow-sm bg-secondary">
               <TrendingDown className="h-8 w-8 text-red-500 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Total Expenses</p>
-              <p className="text-2xl font-semibold">${userProfile.totalExpenses.toLocaleString()}</p>
+              <p className="text-2xl font-semibold">${formattedTotalExpenses}</p>
             </Card>
           </div>
           
@@ -68,7 +108,7 @@ export default function ProfilePage() {
                       <p className="font-medium">{company.name}</p>
                       <p className="text-xs text-muted-foreground">{company.sector}</p>
                     </div>
-                    <p className="font-semibold text-primary">${company.value.toLocaleString()}</p>
+                    <p className="font-semibold text-primary">${formattedCompanyValues[company.id] || company.value}</p>
                   </li>
                 ))}
               </ul>
@@ -81,3 +121,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

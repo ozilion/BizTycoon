@@ -180,8 +180,8 @@ export const DashboardPage: NextPage = () => {
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('biztycoon_balance', balance.toString());
-      // Notify other components about the update
-      window.dispatchEvent(new Event('biztycoon_storage_update'));
+      // DON'T dispatch event here - causes infinite loop!
+      // Only ventures page should dispatch when establishing business
     }
   }, [balance, isLoaded]);
 
@@ -211,8 +211,8 @@ export const DashboardPage: NextPage = () => {
         };
       });
       localStorage.setItem('biztycoon_businesses', JSON.stringify(businessesToSave));
-      // Notify other components about the update
-      window.dispatchEvent(new Event('biztycoon_storage_update'));
+      // DON'T dispatch event here - causes infinite loop!
+      // Only ventures page should dispatch when establishing business
     }
   }, [ownedBusinesses, isLoaded]);
 

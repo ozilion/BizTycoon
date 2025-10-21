@@ -29,6 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { trackAdEngagement, showInterstitialAd, loadInterstitialAd } from '@/services/admob';
 import { useToast } from "@/hooks/use-toast";
+import { StorageDebug } from "@/components/debug/storage-debug";
 
 
 interface Business {
@@ -179,8 +180,8 @@ export const DashboardPage: NextPage = () => {
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('biztycoon_balance', balance.toString());
-      // Notify other components about the update
-      window.dispatchEvent(new Event('biztycoon_storage_update'));
+      // DON'T dispatch event here - causes infinite loop!
+      // Only ventures page should dispatch when establishing business
     }
   }, [balance, isLoaded]);
 
@@ -210,8 +211,8 @@ export const DashboardPage: NextPage = () => {
         };
       });
       localStorage.setItem('biztycoon_businesses', JSON.stringify(businessesToSave));
-      // Notify other components about the update
-      window.dispatchEvent(new Event('biztycoon_storage_update'));
+      // DON'T dispatch event here - causes infinite loop!
+      // Only ventures page should dispatch when establishing business
     }
   }, [ownedBusinesses, isLoaded]);
 
@@ -397,6 +398,9 @@ export const DashboardPage: NextPage = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
+      {/* Debug tools - only show in development */}
+      {process.env.NODE_ENV === 'development' && <StorageDebug />}
+
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-3xl font-bold text-primary">Dashboard</CardTitle>

@@ -24,7 +24,7 @@ import {
   Coffee,
   Gamepad2
 } from "lucide-react";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from "next/image";
 import { trackAdEngagement, showInterstitialAd, loadInterstitialAd } from '@/services/admob';
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +44,7 @@ interface Business {
   productionTime: number; // in seconds
   lastCollected: number; // timestamp
   aiHint: string;
+  baseIncomePerSecond?: number; // Store original income for ad boost revert
 }
 
 const initialBusinesses: Business[] = [
@@ -81,10 +82,19 @@ export const DashboardPage: NextPage = () => {
   const { toast } = useToast();
   const [formattedAvailableBizStrings, setFormattedAvailableBizStrings] = useState<Record<string, FormattedAvailableBusinessStrings>>({});
 
+  // Refs to avoid stale closures
+  const ownedBusinessesRef = useRef<Business[]>([]);
+  const adBoostTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
 
   useEffect(() => {
     loadInterstitialAd();
   }, []);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    ownedBusinessesRef.current = ownedBusinesses;
+  }, [ownedBusinesses]);
 
   useEffect(() => {
     setFormattedBalance(balance.toLocaleString());
@@ -104,7 +114,7 @@ export const DashboardPage: NextPage = () => {
       const now = Date.now();
       let collectedAmount = 0;
 
-      setOwnedBusinesses(prevBusinesses => 
+      setOwnedBusinesses(prevBusinesses =>
         prevBusinesses.map(biz => {
           const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
           const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
@@ -113,17 +123,18 @@ export const DashboardPage: NextPage = () => {
           return { ...biz, lastCollected: biz.lastCollected + collectableSeconds * 1000 };
         })
       );
-      
+
       setBalance(prev => prev + collectedAmount);
 
-      currentTotalIncomePerSecond = ownedBusinesses.reduce((sum, biz) => sum + biz.incomePerSecond, 0);
+      // Use ref to get current businesses instead of stale closure
+      currentTotalIncomePerSecond = ownedBusinessesRef.current.reduce((sum, biz) => sum + biz.incomePerSecond, 0);
       setHourlyIncome(currentTotalIncomePerSecond * 3600);
       setDailyIncome(currentTotalIncomePerSecond * 3600 * 24);
     };
 
     const interval = setInterval(calculateIncome, 1000); // Update income every second
     return () => clearInterval(interval);
-  }, [ownedBusinesses]);
+  }, []); // Empty dependency array - interval runs once and cleanup properly
 
 
   const establishBusiness = (businessToEstablish: Omit<Business, 'id' | 'lastCollected' | 'level'| 'marketValue' | 'upgradeCost'>) => {
@@ -172,29 +183,54 @@ export const DashboardPage: NextPage = () => {
     if (adShown) {
       await trackAdEngagement();
       let boostedBusinessName = "";
-      setOwnedBusinesses(prevBusinesses => 
+
+      // Clear existing timeout for this business if any
+      const existingTimeout = adBoostTimeoutsRef.current.get(businessId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        adBoostTimeoutsRef.current.delete(businessId);
+      }
+
+      setOwnedBusinesses(prevBusinesses =>
         prevBusinesses.map(biz => {
           if (biz.id === businessId) {
             boostedBusinessName = biz.name;
             toast({ title: "Ad Watched!", description: `${biz.name} production boosted!` });
-            return { ...biz, incomePerSecond: biz.incomePerSecond * 1.2 }; // 20% boost
+            // Store base income if not already stored
+            const baseIncome = biz.baseIncomePerSecond ?? biz.incomePerSecond;
+            return {
+              ...biz,
+              baseIncomePerSecond: baseIncome,
+              incomePerSecond: baseIncome * 1.2 // 20% boost from base
+            };
           }
           return biz;
         })
       );
-      setTimeout(() => {
-         setOwnedBusinesses(prevBusinesses => 
+
+      // Store timeout ID for cleanup
+      const timeoutId = setTimeout(() => {
+         setOwnedBusinesses(prevBusinesses =>
             prevBusinesses.map(biz => {
-              if (biz.id === businessId && biz.name === boostedBusinessName) { // ensure we are reverting the correct boost
-                return { ...biz, incomePerSecond: biz.incomePerSecond / 1.2 }; // Revert boost
+              if (biz.id === businessId) {
+                // Restore to base income
+                const restoredIncome = biz.baseIncomePerSecond ?? biz.incomePerSecond;
+                return {
+                  ...biz,
+                  incomePerSecond: restoredIncome,
+                  baseIncomePerSecond: undefined // Clear base income
+                };
               }
               return biz;
             })
           );
+          adBoostTimeoutsRef.current.delete(businessId);
           if (boostedBusinessName) {
             toast({ title: "Boost Expired", description: `Production boost for ${boostedBusinessName} has ended.` });
           }
       }, 60 * 60 * 1000); // Boost for 1 hour
+
+      adBoostTimeoutsRef.current.set(businessId, timeoutId);
     } else {
        toast({ title: "Ad Not Available", description: "Please try again later.", variant: "destructive" });
     }
@@ -202,6 +238,16 @@ export const DashboardPage: NextPage = () => {
 
   // Client-side only state for formatted income values to avoid hydration issues with toLocaleString
   const [clientIncomeReadyToCollect, setClientIncomeReadyToCollect] = useState<{[key: string]: string}>({});
+
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      adBoostTimeoutsRef.current.forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      adBoostTimeoutsRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     const newClientIncomeReadyToCollect: {[key: string]: string} = {};
@@ -223,7 +269,7 @@ export const DashboardPage: NextPage = () => {
     });
     setFormattedAvailableBizStrings(newFormattedAvailableBizStrings);
 
-  }, [ownedBusinesses, balance]); // Re-calculate when businesses or balance changes to update collected amounts
+  }, [ownedBusinesses]); // Removed balance from dependencies - only recalculate when businesses change
 
   return (
     <div className="container mx-auto p-4 space-y-6">

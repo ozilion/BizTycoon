@@ -2,6 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -32,10 +33,10 @@ import {
 
 
 function SettingsDialog() {
-  // Placeholder for settings modal, will be implemented later.
-  // For now, it's a simple button triggering a basic dialog.
+  const [open, setOpen] = useState(false);
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="icon" aria-label="Settings">
           <Settings className="h-5 w-5" />
@@ -48,25 +49,15 @@ function SettingsDialog() {
             Manage your application settings here. More options coming soon!
           </DialogDescription>
         </DialogHeader>
-        {/* Add settings form or content here */}
         <div className="py-4">
           <p className="text-sm text-muted-foreground">
             Settings are currently under development.
           </p>
         </div>
         <DialogFooter>
-          <Button type="button" variant="secondary" onClick={() => {
-            const closeButton = document.querySelector('[data-radix-dialog-default-open="false"]');
-            if (closeButton instanceof HTMLElement) {
-                // This is a bit of a hack to close the dialog if a specific close button is not easily accessible via DialogClose
-                // A more robust solution would be to manage open state with useState if complex close logic is needed.
-                // For now, this targets the auto-generated close button if one exists.
-                // A better way for complex dialogs is managing 'open' state via useState and passing it to Dialog and onOpenChange.
-                // Or ensure DialogClose is used within DialogFooter or where appropriate.
-                // This example is simplified.
-                // A common pattern is to use a ref or manage state.
-            }
-          }}>Close</Button>
+          <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -66,43 +66,76 @@ export default function VenturesPage() {
 
   // Load state from localStorage on mount
   useEffect(() => {
-    const savedBalance = localStorage.getItem('biztycoon_balance');
-    const savedBusinesses = localStorage.getItem('biztycoon_businesses');
+    const loadFromStorage = () => {
+      const savedBalance = localStorage.getItem('biztycoon_balance');
+      const savedBusinesses = localStorage.getItem('biztycoon_businesses');
 
-    if (savedBalance) {
-      setBalance(parseFloat(savedBalance));
-    } else {
-      setBalance(10000); // Default starting balance
-    }
-
-    if (savedBusinesses) {
-      try {
-        const parsed = JSON.parse(savedBusinesses);
-        const iconMap: Record<string, React.ElementType> = {
-          'Banknote': Banknote,
-          'Briefcase': Briefcase,
-          'Fuel': Fuel,
-          'CupSoda': CupSoda,
-          'Laptop': Laptop,
-          'Cookie': Cookie,
-          'Leaf': Leaf,
-          'Coffee': Coffee,
-          'ShoppingCart': ShoppingCart,
-          'Gamepad2': Gamepad2,
-          'Bus': Bus,
-          'Building': Building,
-        };
-        const restoredBusinesses = parsed.map((biz: Business) => ({
-          ...biz,
-          icon: iconMap[biz.icon as unknown as string] || Briefcase
-        }));
-        setOwnedBusinesses(restoredBusinesses);
-      } catch (error) {
-        console.error('Failed to parse saved businesses:', error);
+      if (savedBalance) {
+        setBalance(parseFloat(savedBalance));
+      } else {
+        setBalance(10000); // Default starting balance
       }
-    }
 
+      if (savedBusinesses) {
+        try {
+          const parsed = JSON.parse(savedBusinesses);
+          const iconMap: Record<string, React.ElementType> = {
+            'Banknote': Banknote,
+            'Briefcase': Briefcase,
+            'Fuel': Fuel,
+            'CupSoda': CupSoda,
+            'Laptop': Laptop,
+            'Cookie': Cookie,
+            'Leaf': Leaf,
+            'Coffee': Coffee,
+            'ShoppingCart': ShoppingCart,
+            'Gamepad2': Gamepad2,
+            'Bus': Bus,
+            'Building': Building,
+          };
+          const restoredBusinesses = parsed.map((biz: Business) => ({
+            ...biz,
+            icon: iconMap[biz.icon as unknown as string] || Briefcase
+          }));
+          setOwnedBusinesses(restoredBusinesses);
+        } catch (error) {
+          console.error('Failed to parse saved businesses:', error);
+        }
+      }
+    };
+
+    // Load on mount
+    loadFromStorage();
     setIsLoaded(true);
+
+    // Listen for storage changes from other tabs/windows
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'biztycoon_balance' || e.key === 'biztycoon_businesses') {
+        loadFromStorage();
+      }
+    };
+
+    // Listen for custom event when localStorage is updated in the same page
+    const handleLocalUpdate = () => {
+      loadFromStorage();
+    };
+
+    // Listen for visibility change to reload when page becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadFromStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('biztycoon_storage_update', handleLocalUpdate);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('biztycoon_storage_update', handleLocalUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -161,6 +194,9 @@ export default function VenturesPage() {
         };
       });
       localStorage.setItem('biztycoon_businesses', JSON.stringify(businessesToSave));
+
+      // Notify other components that localStorage has been updated
+      window.dispatchEvent(new Event('biztycoon_storage_update'));
 
       toast({ title: "Business Established!", description: `${newBusiness.name} is now part of your empire.` });
     } else {

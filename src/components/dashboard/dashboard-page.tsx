@@ -84,6 +84,7 @@ export const DashboardPage: NextPage = () => {
   const [formattedDailyIncome, setFormattedDailyIncome] = useState("0");
   const { toast } = useToast();
   const [formattedAvailableBizStrings, setFormattedAvailableBizStrings] = useState<Record<string, FormattedAvailableBusinessStrings>>({});
+  const [currentTime, setCurrentTime] = useState(Date.now()); // For updating UI every second
 
   // Refs to avoid stale closures
   const ownedBusinessesRef = useRef<Business[]>([]);
@@ -262,6 +263,9 @@ export const DashboardPage: NextPage = () => {
       const currentTotalIncomePerSecond = ownedBusinessesRef.current.reduce((sum, biz) => sum + biz.incomePerSecond, 0);
       setHourlyIncome(currentTotalIncomePerSecond * 3600);
       setDailyIncome(currentTotalIncomePerSecond * 3600 * 24);
+
+      // Update current time to trigger UI re-render for progress bars
+      setCurrentTime(now);
     };
 
     const interval = setInterval(calculateIncome, 1000); // Update income every second
@@ -389,8 +393,7 @@ export const DashboardPage: NextPage = () => {
   useEffect(() => {
     const newClientIncomeReadyToCollect: {[key: string]: string} = {};
     ownedBusinesses.forEach(biz => {
-      const now = Date.now();
-      const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+      const secondsSinceLastCollect = Math.floor((currentTime - biz.lastCollected) / 1000);
       const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
       const incomeReady = collectableSeconds * biz.incomePerSecond;
       newClientIncomeReadyToCollect[biz.id] = incomeReady.toLocaleString();
@@ -406,7 +409,7 @@ export const DashboardPage: NextPage = () => {
     });
     setFormattedAvailableBizStrings(newFormattedAvailableBizStrings);
 
-  }, [ownedBusinesses]); // Removed balance from dependencies - only recalculate when businesses change
+  }, [ownedBusinesses, currentTime]); // Update every second when currentTime changes
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -462,8 +465,7 @@ export const DashboardPage: NextPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ownedBusinesses.map((biz) => {
-              const now = Date.now();
-              const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+              const secondsSinceLastCollect = Math.floor((currentTime - biz.lastCollected) / 1000);
               const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
               const progressPercentage = biz.productionTime > 0 ? (collectableSeconds / biz.productionTime) * 100 : 0;
               const incomeReadyToCollectNum = collectableSeconds * biz.incomePerSecond;

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from 'react';
 import Image from "next/image";
+import Link from "next/link";
 import { trackAdEngagement, showInterstitialAd, loadInterstitialAd } from '@/services/admob';
 import { useToast } from "@/hooks/use-toast";
 
@@ -72,6 +73,7 @@ interface FormattedAvailableBusinessStrings {
 
 export const DashboardPage: NextPage = () => {
   const initialBalance = 10000;
+  const [isLoaded, setIsLoaded] = useState(false);
   const [balance, setBalance] = useState(initialBalance);
   const [formattedBalance, setFormattedBalance] = useState(initialBalance.toString());
   const [ownedBusinesses, setOwnedBusinesses] = useState<Business[]>([]);
@@ -87,9 +89,86 @@ export const DashboardPage: NextPage = () => {
   const adBoostTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
 
+  // Load state from localStorage on mount
   useEffect(() => {
     loadInterstitialAd();
+
+    // Load saved data from localStorage
+    const savedBalance = localStorage.getItem('biztycoon_balance');
+    const savedBusinesses = localStorage.getItem('biztycoon_businesses');
+
+    if (savedBalance) {
+      setBalance(parseFloat(savedBalance));
+    }
+
+    if (savedBusinesses) {
+      try {
+        const parsed = JSON.parse(savedBusinesses);
+        // Restore icon references from the available businesses list
+        const restoredBusinesses = parsed.map((biz: Business) => {
+          const iconMap: Record<string, React.ElementType> = {
+            'Banknote': Banknote,
+            'Briefcase': Briefcase,
+            'Fuel': Fuel,
+            'CupSoda': CupSoda,
+            'Laptop': Laptop,
+            'Cookie': Cookie,
+            'Leaf': Leaf,
+            'Coffee': Coffee,
+            'ShoppingCart': ShoppingCart,
+            'Gamepad2': Gamepad2,
+            'Bus': Bus,
+            'Building': Building,
+          };
+          return {
+            ...biz,
+            icon: iconMap[biz.icon as unknown as string] || Briefcase
+          };
+        });
+        setOwnedBusinesses(restoredBusinesses);
+      } catch (error) {
+        console.error('Failed to parse saved businesses:', error);
+      }
+    }
+
+    setIsLoaded(true);
   }, []);
+
+  // Save balance to localStorage whenever it changes
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('biztycoon_balance', balance.toString());
+    }
+  }, [balance, isLoaded]);
+
+  // Save businesses to localStorage whenever they change
+  useEffect(() => {
+    if (isLoaded) {
+      // Convert businesses to JSON, storing icon name instead of function
+      const businessesToSave = ownedBusinesses.map(biz => {
+        // Find icon name by reference
+        let iconName = 'Briefcase'; // default
+        if (biz.icon === Banknote) iconName = 'Banknote';
+        else if (biz.icon === Briefcase) iconName = 'Briefcase';
+        else if (biz.icon === Fuel) iconName = 'Fuel';
+        else if (biz.icon === CupSoda) iconName = 'CupSoda';
+        else if (biz.icon === Laptop) iconName = 'Laptop';
+        else if (biz.icon === Cookie) iconName = 'Cookie';
+        else if (biz.icon === Leaf) iconName = 'Leaf';
+        else if (biz.icon === Coffee) iconName = 'Coffee';
+        else if (biz.icon === ShoppingCart) iconName = 'ShoppingCart';
+        else if (biz.icon === Gamepad2) iconName = 'Gamepad2';
+        else if (biz.icon === Bus) iconName = 'Bus';
+        else if (biz.icon === Building) iconName = 'Building';
+
+        return {
+          ...biz,
+          icon: iconName
+        };
+      });
+      localStorage.setItem('biztycoon_businesses', JSON.stringify(businessesToSave));
+    }
+  }, [ownedBusinesses, isLoaded]);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -301,46 +380,6 @@ export const DashboardPage: NextPage = () => {
         </CardContent>
       </Card>
 
-      <Separator />
-
-      <div id="available-ventures">
-        <h2 className="text-2xl font-semibold mb-4 text-primary">Available Ventures</h2>
-        {availableBusinesses.filter(availBiz => !ownedBusinesses.some(ownedBiz => ownedBiz.name === availBiz.name)).length === 0 && <p className="text-muted-foreground">You've established all available ventures for now! Expand your current ones or check back later for new opportunities.</p>}
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {availableBusinesses.filter(availBiz => !ownedBusinesses.some(ownedBiz => ownedBiz.name === availBiz.name)).map((biz, index) => (
-            <Card key={index} className="shadow-md hover:shadow-xl transition-shadow duration-300">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-xl"><biz.icon className="h-6 w-6 text-primary" />{biz.name}</CardTitle>
-                   <span className="text-xs text-muted-foreground">{biz.sector}</span>
-                </div>
-                <CardDescription>
-                    {formattedAvailableBizStrings[biz.name] ? 
-                        `Cost: $${formattedAvailableBizStrings[biz.name].cost} | Income: $${formattedAvailableBizStrings[biz.name].incomePerSecond}/sec`
-                        : `Cost: $${biz.cost.toLocaleString()} | Income: $${biz.incomePerSecond.toLocaleString()}/sec`
-                    }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Image 
-                  src={biz.imageUrl} 
-                  alt={biz.name} 
-                  width={400} 
-                  height={200} 
-                  className="rounded-md mb-4 object-cover aspect-video"
-                  data-ai-hint={biz.aiHint} 
-                />
-                <Button onClick={() => establishBusiness(biz)} className="w-full" disabled={balance < biz.cost}>
-                  Establish Business
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-      
-      <Separator />
 
       <div>
         <h2 className="text-2xl font-semibold mb-4 text-primary">My Businesses</h2>
@@ -351,15 +390,12 @@ export const DashboardPage: NextPage = () => {
               <CardTitle className="text-xl">No Businesses Yet!</CardTitle>
             </CardHeader>
             <CardContent>
-              <CardDescription className="mb-4">Start your empire by establishing a new business venture from the "Available Ventures" section.</CardDescription>
-              <Button onClick={() => {
-                  const availableVenturesSection = document.querySelector('#available-ventures');
-                  if (availableVenturesSection) {
-                    availableVenturesSection.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}>
-                Find Ventures
-              </Button>
+              <CardDescription className="mb-4">Start your empire by establishing a new business venture.</CardDescription>
+              <Link href="/ventures">
+                <Button className="w-full">
+                  Find Ventures
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         ) : (

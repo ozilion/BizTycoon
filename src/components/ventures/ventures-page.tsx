@@ -67,6 +67,9 @@ export default function VenturesPage() {
 
   // Load state from localStorage on mount
   useEffect(() => {
+    // Ensure mounted flag is set to true
+    isMountedRef.current = true;
+
     const loadFromStorage = () => {
       // Guard against state updates on unmounted component
       if (!isMountedRef.current) return;

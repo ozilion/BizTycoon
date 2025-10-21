@@ -470,14 +470,32 @@ export const DashboardPage: NextPage = () => {
               const displayIncomeReadyToCollect = clientIncomeReadyToCollect[biz.id] || '0';
 
 
+              const isBoosted = biz.baseIncomePerSecond !== undefined;
+              const boostMultiplier = isBoosted ? (biz.incomePerSecond / (biz.baseIncomePerSecond || 1)) : 1;
+
               return (
-                <Card key={biz.id} className="shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col">
+                <Card key={biz.id} className={`shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col ${isBoosted ? 'border-2 border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20' : ''}`}>
                   <CardHeader>
                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2 text-xl"><biz.icon className="h-6 w-6 text-primary" />{biz.name}</CardTitle>
-                        <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full">Lvl {biz.level}</span>
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                          <biz.icon className="h-6 w-6 text-primary" />
+                          {biz.name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          {isBoosted && (
+                            <span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-semibold flex items-center gap-1 animate-pulse">
+                              <Zap className="h-3 w-3" /> BOOSTED x{boostMultiplier.toFixed(1)}
+                            </span>
+                          )}
+                          <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full">Lvl {biz.level}</span>
+                        </div>
                      </div>
-                    <CardDescription>Sector: {biz.sector} | Income: ${biz.incomePerSecond.toLocaleString()}/sec</CardDescription>
+                    <CardDescription>
+                      Sector: {biz.sector} | Income: ${biz.incomePerSecond.toLocaleString()}/sec
+                      {isBoosted && (
+                        <span className="text-yellow-600 dark:text-yellow-400 font-semibold"> (Base: ${(biz.baseIncomePerSecond || 0).toLocaleString()}/sec)</span>
+                      )}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow flex flex-col justify-between">
                     <div>
@@ -502,8 +520,13 @@ export const DashboardPage: NextPage = () => {
                         <Button onClick={() => collectIncome(biz.id)} className="w-full" disabled={incomeReadyToCollectNum <= 0}>
                             Collect ${displayIncomeReadyToCollect}
                         </Button>
-                        <Button onClick={() => handleWatchAd(biz.id)} variant="outline" className="w-full border-accent text-accent hover:bg-accent/10">
-                            <Zap className="mr-2 h-4 w-4" /> Watch Ad for Boost
+                        <Button
+                          onClick={() => handleWatchAd(biz.id)}
+                          variant="outline"
+                          className={`w-full ${isBoosted ? 'border-yellow-400 text-yellow-600 bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-400' : 'border-accent text-accent hover:bg-accent/10'}`}
+                          disabled={isBoosted}
+                        >
+                            <Zap className="mr-2 h-4 w-4" /> {isBoosted ? 'Boost Active!' : 'Watch Ad for Boost'}
                         </Button>
                     </div>
                   </CardContent>

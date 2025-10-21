@@ -320,7 +320,7 @@ export const DashboardPage: NextPage = () => {
         prevBusinesses.map(biz => {
           if (biz.id === businessId) {
             boostedBusinessName = biz.name;
-            toast({ title: "Ad Watched!", description: `${biz.name} production boosted!` });
+            // DON'T call toast here - it's inside setState callback!
             // Store base income if not already stored
             const baseIncome = biz.baseIncomePerSecond ?? biz.incomePerSecond;
             return {
@@ -332,6 +332,11 @@ export const DashboardPage: NextPage = () => {
           return biz;
         })
       );
+
+      // Show toast AFTER setState is done
+      if (boostedBusinessName) {
+        toast({ title: "Ad Watched!", description: `${boostedBusinessName} production boosted!` });
+      }
 
       // Store timeout ID for cleanup
       const timeoutId = setTimeout(() => {

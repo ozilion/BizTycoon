@@ -235,24 +235,31 @@ export const DashboardPage: NextPage = () => {
 
   useEffect(() => {
     const calculateIncome = () => {
-      let currentTotalIncomePerSecond = 0;
       const now = Date.now();
       let collectedAmount = 0;
+      const updatedBusinesses: Business[] = [];
 
-      setOwnedBusinesses(prevBusinesses =>
-        prevBusinesses.map(biz => {
-          const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
-          const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
-          const incomeGenerated = collectableSeconds * biz.incomePerSecond;
-          collectedAmount += incomeGenerated;
-          return { ...biz, lastCollected: biz.lastCollected + collectableSeconds * 1000 };
-        })
-      );
+      // Calculate income and update lastCollected
+      ownedBusinessesRef.current.forEach(biz => {
+        const secondsSinceLastCollect = Math.floor((now - biz.lastCollected) / 1000);
+        const collectableSeconds = Math.min(secondsSinceLastCollect, biz.productionTime);
+        const incomeGenerated = collectableSeconds * biz.incomePerSecond;
+        collectedAmount += incomeGenerated;
 
-      setBalance(prev => prev + collectedAmount);
+        updatedBusinesses.push({
+          ...biz,
+          lastCollected: biz.lastCollected + collectableSeconds * 1000
+        });
+      });
 
-      // Use ref to get current businesses instead of stale closure
-      currentTotalIncomePerSecond = ownedBusinessesRef.current.reduce((sum, biz) => sum + biz.incomePerSecond, 0);
+      // Update businesses if there's any collection
+      if (collectedAmount > 0) {
+        setOwnedBusinesses(updatedBusinesses);
+        setBalance(prev => prev + collectedAmount);
+      }
+
+      // Calculate total income per second
+      const currentTotalIncomePerSecond = ownedBusinessesRef.current.reduce((sum, biz) => sum + biz.incomePerSecond, 0);
       setHourlyIncome(currentTotalIncomePerSecond * 3600);
       setDailyIncome(currentTotalIncomePerSecond * 3600 * 24);
     };
@@ -358,7 +365,7 @@ export const DashboardPage: NextPage = () => {
           if (boostedBusinessName) {
             toast({ title: "Boost Expired", description: `Production boost for ${boostedBusinessName} has ended.` });
           }
-      }, 60 * 60 * 1000); // Boost for 1 hour
+      }, 30 * 1000); // Boost for 30 seconds (for testing - change to 60*60*1000 for 1 hour)
 
       adBoostTimeoutsRef.current.set(businessId, timeoutId);
     } else {

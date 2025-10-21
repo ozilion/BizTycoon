@@ -93,51 +93,86 @@ export const DashboardPage: NextPage = () => {
   useEffect(() => {
     loadInterstitialAd();
 
-    // Load saved data from localStorage
-    const savedBalance = localStorage.getItem('biztycoon_balance');
-    const savedBusinesses = localStorage.getItem('biztycoon_businesses');
+    const loadFromStorage = () => {
+      // Load saved data from localStorage
+      const savedBalance = localStorage.getItem('biztycoon_balance');
+      const savedBusinesses = localStorage.getItem('biztycoon_businesses');
 
-    if (savedBalance) {
-      setBalance(parseFloat(savedBalance));
-    }
-
-    if (savedBusinesses) {
-      try {
-        const parsed = JSON.parse(savedBusinesses);
-        // Restore icon references from the available businesses list
-        const restoredBusinesses = parsed.map((biz: Business) => {
-          const iconMap: Record<string, React.ElementType> = {
-            'Banknote': Banknote,
-            'Briefcase': Briefcase,
-            'Fuel': Fuel,
-            'CupSoda': CupSoda,
-            'Laptop': Laptop,
-            'Cookie': Cookie,
-            'Leaf': Leaf,
-            'Coffee': Coffee,
-            'ShoppingCart': ShoppingCart,
-            'Gamepad2': Gamepad2,
-            'Bus': Bus,
-            'Building': Building,
-          };
-          return {
-            ...biz,
-            icon: iconMap[biz.icon as unknown as string] || Briefcase
-          };
-        });
-        setOwnedBusinesses(restoredBusinesses);
-      } catch (error) {
-        console.error('Failed to parse saved businesses:', error);
+      if (savedBalance) {
+        setBalance(parseFloat(savedBalance));
       }
-    }
 
+      if (savedBusinesses) {
+        try {
+          const parsed = JSON.parse(savedBusinesses);
+          // Restore icon references from the available businesses list
+          const restoredBusinesses = parsed.map((biz: Business) => {
+            const iconMap: Record<string, React.ElementType> = {
+              'Banknote': Banknote,
+              'Briefcase': Briefcase,
+              'Fuel': Fuel,
+              'CupSoda': CupSoda,
+              'Laptop': Laptop,
+              'Cookie': Cookie,
+              'Leaf': Leaf,
+              'Coffee': Coffee,
+              'ShoppingCart': ShoppingCart,
+              'Gamepad2': Gamepad2,
+              'Bus': Bus,
+              'Building': Building,
+            };
+            return {
+              ...biz,
+              icon: iconMap[biz.icon as unknown as string] || Briefcase
+            };
+          });
+          setOwnedBusinesses(restoredBusinesses);
+        } catch (error) {
+          console.error('Failed to parse saved businesses:', error);
+        }
+      }
+    };
+
+    // Load on mount
+    loadFromStorage();
     setIsLoaded(true);
+
+    // Listen for storage changes from other tabs/windows or same page
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'biztycoon_balance' || e.key === 'biztycoon_businesses') {
+        loadFromStorage();
+      }
+    };
+
+    // Listen for custom event when localStorage is updated in the same page
+    const handleLocalUpdate = () => {
+      loadFromStorage();
+    };
+
+    // Listen for visibility change to reload when page becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadFromStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('biztycoon_storage_update', handleLocalUpdate);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('biztycoon_storage_update', handleLocalUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Save balance to localStorage whenever it changes
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('biztycoon_balance', balance.toString());
+      // Notify other components about the update
+      window.dispatchEvent(new Event('biztycoon_storage_update'));
     }
   }, [balance, isLoaded]);
 
@@ -167,6 +202,8 @@ export const DashboardPage: NextPage = () => {
         };
       });
       localStorage.setItem('biztycoon_businesses', JSON.stringify(businessesToSave));
+      // Notify other components about the update
+      window.dispatchEvent(new Event('biztycoon_storage_update'));
     }
   }, [ownedBusinesses, isLoaded]);
 

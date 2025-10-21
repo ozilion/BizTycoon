@@ -87,6 +87,7 @@ export const DashboardPage: NextPage = () => {
   // Refs to avoid stale closures
   const ownedBusinessesRef = useRef<Business[]>([]);
   const adBoostTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const isMountedRef = useRef(true);
 
 
   // Load state from localStorage on mount
@@ -94,6 +95,9 @@ export const DashboardPage: NextPage = () => {
     loadInterstitialAd();
 
     const loadFromStorage = () => {
+      // Guard against state updates on unmounted component
+      if (!isMountedRef.current) return;
+
       // Load saved data from localStorage
       const savedBalance = localStorage.getItem('biztycoon_balance');
       const savedBusinesses = localStorage.getItem('biztycoon_businesses');
@@ -161,6 +165,7 @@ export const DashboardPage: NextPage = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      isMountedRef.current = false;
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('biztycoon_storage_update', handleLocalUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);

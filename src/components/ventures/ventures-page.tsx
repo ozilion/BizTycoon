@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -63,10 +63,14 @@ export default function VenturesPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const { toast } = useToast();
   const [formattedBizStrings, setFormattedBizStrings] = useState<Record<string, FormattedBusinessStrings>>({});
+  const isMountedRef = useRef(true);
 
   // Load state from localStorage on mount
   useEffect(() => {
     const loadFromStorage = () => {
+      // Guard against state updates on unmounted component
+      if (!isMountedRef.current) return;
+
       const savedBalance = localStorage.getItem('biztycoon_balance');
       const savedBusinesses = localStorage.getItem('biztycoon_businesses');
 
@@ -132,6 +136,7 @@ export default function VenturesPage() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      isMountedRef.current = false;
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('biztycoon_storage_update', handleLocalUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
